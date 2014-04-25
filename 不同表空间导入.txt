@@ -1,0 +1,37 @@
+orcl 用户naspdev 用户表全部在 user表空间下，exp 导出；
+
+imp 到用户naspdev2 ，计划导入到 nasp_table_space表空间：
+
+直接imp，还是全部导入到了user下，（imp 可以指定tablespace参数，但是作用不是这个，是为表空间导入导出用的）
+
+方案：
+
+sqlplus sysdba权限登录
+
+--撤销用户naspdev2的unlimited tablespac配额；
+SQL> revoke unlimited tablespace from naspdev2;
+
+--将nasp_table_space设置为naspdev2的默认表空间
+
+--并给naspdev2的nasp_table_space的unlimited配额；
+
+SQL> alter user naspdev2 default tablespace nasp_table_space;
+
+SQL> alter user naspdev2 quota unlimited on nasp_table_space;
+
+--设置naspdev2对system，users表空间的配额为0；
+
+SQL> alter user naspdev2 quota 0 on system;
+
+SQL> alter user naspdev2 quota 0 on users;
+
+--
+
+重新imp，ok
+
+====
+
+总结：
+
+简言之，让imp没地方导入，只能往默认表空间中导入。
+ 

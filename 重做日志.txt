@@ -1,0 +1,22 @@
+
+v$LOGFILE 
+
+select GROUP#,MEMBER FROM V$LOGFILE;
+
+select * from v$logfile;
+select * from v$log
+
+切换日志：alter system switch logfile;
+添加日志文件：ALTER DATABASE ADD LOGFILE 'E:\OracleRedoFile\redo04.log'
+              size 20  --(会自动创建一个日志组)
+
+	      ALTER DATABASE ADD LOGFILE group 4 'E:\OracleRedoFile\redo04.log' SIZE 20M
+添加日志成员：ALTER DATABASE ADD LOGFILE member  'E:\OracleRedoFile\redoB4.log' to GROUP 1, 'E:\OracleRedoFile\redoB5.log' TO GROUP2;
+
+删除日志组成员： ALTER DATABASE DROP LOGFILE member E:\OracleRedoFile\redoB5.log' --（不能删除当前日志组的成员 不然会出错）
+                                                                                 
+                 ALTER DATABASE DROP LOGFILE GROUP 2 --（不能删除当前日志组的成员 不然会出错）
+ 移动日志
+ host copy E:\ORACLEREDOFILE\REDOB5.LOG D:\ORACLE\ORADATA\ORCL\REDOB5.LOG
+ ALTER DATABASE RENAME FILE 'E:\ORACLEREDOFILE\REDOB5.LOG' TO 'D:\ORACLE\ORADATA\ORCL\REDOB5.LOG'
+ 

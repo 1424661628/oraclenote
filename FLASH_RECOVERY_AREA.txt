@@ -1,0 +1,33 @@
+﻿何为闪回恢复区
+Oracle 10g 有一项新功能称为:自动的基于磁盘的备份与恢复( Automatic Disk-Based Backup and Recovery )。实现该功能的基础为本文要讲述的闪回恢复区( Flash Recovery Area )。闪回恢复区是 Oracle 10g 中的新事物。简单的说，闪回恢复区是一块用以存储恢复相关的文件的存储空间。允许用户集中存储所有恢复相关的文件。
+闪回恢复区可以放在如下几种存储形式上:
+•	目录 
+•	一个文件系统 
+•	自动存储管理(ASM)磁盘组 
+在 RAC 环境中,这个该位置必须为 集群文件系统 (cluster file system) 或是 ASM 磁盘组亦或是通过 NFS 控制的文件共享目录，还要注意的是，所有实例的位置和操作系统的磁盘限额 (disk quota) 必须一致。
+如下几种文件可以放到闪回恢复区中:
+•	控制文件 
+•	归档的日志文件(注：Oracle 手册上所说的在设定flash recovery area之后，LOG_ARCHIVE_DEST_10的值将自动设定为flash recovery area的位置，这个变化在笔者测试过程中观察不到) 
+•	闪回日志 
+•	控制文件和 SPFILE 自动备份 
+•	RMAN 备份集 
+•	数据文件拷贝 
+为何要用闪回恢复区?
+如前所述，闪回恢复区提供了一个集中化的存储区域，很大程度上减小了管理开销。这是其最主要的优点。与 RMAN 结合使用可以进行快速恢复。
+近年来随着存储技术的发展，单个磁盘的存储能力已经加强。这使自动的基于磁盘的备份与恢复的技术实现成为可能。而闪回恢复区恰是基于磁盘的备份与恢复的基础。把闪回恢复区和 OMF 与 ASM 结合运用看起来是比较完美的方案。当然，不可否认的是，自动备份恢复技术还远远不够成熟。
+
+调整如下两个动态初始化参数(无需重新启动实例)：
+SQL> ALTER SYSTEM SET db_recovery_file_dest_size=2g SCOPE=BOTH;
+SQL> ALTER SYSTEM SET db_recovery_file_dest='/u01/app/oracle/flash_recovery_area'
+  2  SCOPE=BOTH;
+SQL>
+之后查看所作的修改是否生效： 
+SQL> SHOW parameter db_recovery_file_dest
+
+
+      show parameter db_rec
+
+     select * from v$recovery_file_dest;
+      select * from v$flash_recovery_area_usage;
+
+

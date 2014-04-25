@@ -1,0 +1,39 @@
+ 有朋友多RMAN里的channel的含义不是很清楚
+
+这里特此总结记录一下
+
+Channel可以看作是一个IO的进程，所以多通道的方式一般是提供RMAN的backup的并行度，对于多IO支持的设备，效果明显。
+
+在执行我们执行backup,restore,delete等有关物理文件的磁盘IO的命令是，我们可以用allocate channel来给他们分配通道，这里也可以执行多个allocate channel来分配多个通道，这个allocate channel必须在run的命令块里包含。例如
+
+run { allocate channel c1 maxpiecesize=100m device type disk format '/backup/%T_%t_%U'; backup incremental level 0 database tag 'level_0_datafile'; }
+
+rman执行这些命令的时候，至少需要一个通道，多个通道的话就会对应多个进程来进行IO的操作。直白一点的话，多一个通道，可以看做是多了一个IO的进程来进行操作。
+
+我们也可以在run里不allocate通道，这时就没有手动的指定通道，那么就会用默认的通道，也就是预定义的通道了。 预定义的通道，可以通过show all来查看。
+
+下列预定义配置命令均可以分配通道： CONFIGURE DEVICE TYPE ... PARALLELISM CONFIGURE DEFAULT DEVICE TYPE CONFIGURE CHANNEL DEVICE TYPE CONFIGURE CHANNEL n DEVICE TYPE MAN（Recovery Manager，恢复管理器）是Oracle Database 10g 所提供的实用程序，他可以协助DBA管理备份、转储和恢复操作。当执行 RMAN  命令时，Oracle会将这些命令解析为PL/SQL块，并且由服务器进程执行这些PL/SQL块，最终完成备份、转储、恢复以及其他操作。因为 RMAN  备份、转储、恢复操作都是由服务器进程来执行的，所以 RMAN  所进行的备份和恢复操作也称为 " 服务器管理的备份与恢复 "。
+
+RMAN 组件
+
+1、目标数据库（target database）
+
+      目标数据库是指要执行备份、转储和恢复操作的数据库，它实际是指应用系统所涉及到的产品数据库，对于OLTP系统(On-Line Transaction Processing联机事务处理系统)，Oracle建议目标数据库采用 ARCHIVELOG模式，对于只读应用系统（DDS）来说，Oracle建议目标数据库应该采用NOARCHIVELOG模式。
+
+2、服务器进程
+
+     在使用RMAN执行备份、转储和恢复之前，必须先要链接到数据库。当链接到目标数据库时，会建立两个链接到目标数据库的服务器进程。其中默认服务器进程用于解析RMAN命令，并生成隐含执行的PL/SQL块。轮询服务器进程用于检查备份、转储和恢复操作是否已经完成。
+
+3、通道（Channel）
+
+      通道用于执行和记录备份、转储和恢复操作。当使用RMAN在存储设备（磁盘或磁带）上执行备份、转储和恢复操作时，RMAN 需要在存储设备和目标数据库之间建立连接，该连接被称为通道。当在磁盘或磁带上执行备份、转储和恢复操作时，都需要分配通道。读者要把握一个原则，当在存储设备上执行I/O操作时，必须分配相应的通道。在Oracle Database 10g 中，既可以让RMAN 自动分配通道，也可以手工分配通道。
+
+4、RMAN 资料库（Recovery Manager Repository）和RMAN 元数据（Recovery Manager Metadata）
+
+      RMAN 元数据是指RMAN 在执行备份、转储和恢复操作中所使用的数据，RMAN 元数据的集合被称为RMAN 资料库。当使用RMAN执行备份、转储和恢复操作时，Oracle总是将RMAN元数据存放到目标数据库的控制文件中。如果配置了恢复目录，那么RMAN元数据还会被存放到恢复目录中。
+
+5、恢复目录
+
+     恢复目录用于存放RMAN元数据，它是存放RMAN元数据的一个可选设置。当使用目标数据库控制文件存放RMAN元数据时，在 RMAN 元数据存放天数达到初始化参数control_file_record_keep_time的值之后，其元数据可能被覆盖。从而导致之前的备份不能使用。通过使用恢复目录，可以永久保存需要的 RMAN 元数据。另外，在恢复目录中还可以存放存储脚本。如果不使用恢复目录，那么RMAN元数据会存放到目标数据库的控制文件。如果使用恢复目录，那么RMAN 元数据不仅会存放到目标数据库的控制文件中，而且还会存放到恢复目录中。注意，如果要使用恢复目录存储RMAN 元数据，那么一定要将恢复目录方案放在与目标数据库不同的数据库中。
+
+6、介质管理层（Media Management Layer）

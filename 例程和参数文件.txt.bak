@@ -1,0 +1,169 @@
+﻿oracle参数文件
+	参数文件主要用于存放初始化参数，oracle 10g提供了200多个初始化参数，并且大多数参数都有默认值。这些参数主要用于设置例程和数据的特征,例如通过这些参数可以设置SGA大小,
+	设置数据库名称，设置控制文件、跟踪文件和警报文件的位置等等。
+
+参数文件路径：
+	windows(11g r2):实际安装路径为准
+	SPfile D:\app\Administrator\product\11.2.0\dbhome_2\database\SPFILEORCL.ORA (2进制文件)
+	PFILE D:\app\Administrator\admin\orcl\pfile\init.ORA
+
+	linux(11g r2):
+	     spfle:$ORACLE_HOME/dbs/spfile$ORACLE_SID.ora
+	     pfile：$ORACLE_HOME/dbs/init.ora 
+
+创建参数文件：
+	PFILE和SPFILE可以互相转换
+	T-SQL:
+	create spfile from pfile;
+	create pfile from spfile;
+	也可以指定路径创建：
+	create PFILE='c:\INITORCL.ORA' FROM SPFILE='D:\app\Administrator\product\11.2.0\dbhome_2\database\SPFILEORCL.ORA';
+
+显示参数文件参数 
+
+sqlplus:show paramter; 
+pl/sql: select  type,name,value from v$parameter
+
+
+1）如果要对spfile文件进行修改，可以在数据库运行时采用SQL语言： 
+ 
+　　SQL> ALTER SYSTEM SET PARAMETER = 'VALUES';进行修改。 修改参数文件的例如：ALTER SYSTREM SET processes=160 SCODE=MEMORY(SPFILE)
+ 
+　　ALTER SYSTEM还有选项：SCOPE。SCOPE参数有三个可选值：MEMORY ,SPFILE , BOTH
+　　MEMORY:只改变当前 实例运行
+　　SPFILE:只改变SPFILE的设置
+　　BOTH:改变实例及SPFILE
+
+2，spfile  可以在数据库运行时动态修改参数，有些不需要重启数据库，特殊的还要重启才能生效。
+而pfile 不能动态修改数据库参数，文本编辑后必须重启数据库
+ 
+ 
+3，启动时的查找顺序：
+spfile<sid>.ora > spfile.ora > init<sid>.ora  （也就是说spfile优先于pfile，而且本实例设置优先于全局设置）
+ 
+也可以在启动时指定用哪个文件： 
+SQL>startup pfile='Your_Pfile.ora'
+SQL>startup spfile='\product\11.1.0\db_1\database\SPFILE_SINKA.ORA' force 
+
+
+
+参考
+
+1>pfile文件参数详解
+pfile文件(parameter file)文件是基于文本格式的参数文件，含有数据库的配置参数。
+oracle在安装时为每个数据库建立一个pfile文件，默认名为“init+例程名.ora”,这是一个文本文件，可以用任何文本编辑工具打开。
+下表为Oracle10g数据库的初始化参数文件分析：
+
+##############################################################################
+# Copyright (c) 1991, 2001, 2002 by Oracle Corporation
+##############################################################################
+
+###########################################
+# Archive 归档参数的设置
+###########################################
+#log_archive_start=false Oracle被设置为非自动归档
+
+###########################################
+# Cache and I/O 高速缓存和I/O
+###########################################
+db_block_size=16384 指定数据块大小为16KB
+db_cache_size=251658240 指定数据库高速缓存大小为251658240/1024/1024=240(MB)
+db_file_multiblock_read_count=16 数据库每次能读写的最大数据块个数为16个，这样设置后，每次数据库最大可以读取16KB*16=256KB的数据
+
+###########################################
+# Cursors and Library Cache 游标和库高速缓存(历史SQL语句放在Library Cache里面，数据字典的定义放在dictionary cache里面)
+###########################################
+open_cursors=1000 指定一个会话一次可以打开的游标的最大数量为1000，应将该值设置得足够高，这样才能防止应用程序耗尽打开的游标
+
+###########################################
+# Database Identification 数据库标识
+###########################################
+db_domain="" 若你的数据库域名为mynet,加上数据库名称db_name构成全局数据库名称
+db_name=boncbi 数据库名称为boncbi
+
+###########################################
+# Diagnostics and Statistics 诊断和统计
+###########################################
+background_dump_dest=/oracle/oracle/admin/boncbi/bdump 后台进程跟踪文件目录
+core_dump_dest=/oracle/oracle/admin/boncbi/cdump 核心转储跟踪文件目录
+timed_statistics=TRUE 收集操作系统的计时信息，这些信息可用来显示时间等统计信息，优化数据库及SQL语句，要防止因从操作系统请求时间引起的开销，请将该值设置为FALSE,设置为TRUE的利大于弊，一般只用来系统诊断及调优的时候
+user_dump_dest=/oracle/oracle/admin/boncbi/udump 用户进程跟踪文件目录
+
+###########################################
+# Distributed, Replication and Snapshot
+###########################################
+global_names=true 设置TRUE：创建的DB_LINK的名字必须与目标库的DB_NAME一致，否则出错，设置FALSE:创建DB_LINK的名字与目标库的DB_NAME无关
+
+###########################################
+# File Configuration 文件配置信息
+###########################################
+control_files=("/dev/rlv_vgdata3_da61", "/dev/rlv_vgdata3_da62", "/dev/rlv_vgdata3_da63", "/dev/rlv_vgdata3_da64") 控制文件存放的路径及文件名
+db_files=1000 数据库所能创建的最大数据文件个数，叵数据文件个数接近此值，需要把此值调大，同时此值受maxdatafiles关键字的限制，这个关键字在控制谁的中设置，若需修改，必须重建控制文件。
+
+###########################################
+# Instance Identification 实例鉴定
+###########################################
+instance_name=boncbi 数据库实例名为boncbi
+
+###########################################
+# MTS 多线程服务器配置标识，在Oracle9I里称为共享服务器配置
+###########################################
+dispatchers="(PROTOCOL=TCP) (SERVICE=boncbiXDB)" 多线程服务器配置
+
+###########################################
+# Miscellaneous 数据库版本
+###########################################
+compatible=9.2.0.0.0 这个一定要牢记
+
+###########################################
+# Optimizer
+###########################################
+hash_join_enabled=TRUE 允许散列连接
+query_rewrite_enabled=true 与物化视图相关的一个属性
+star_transformation_enabled=FALSE 若要使用位图索引，此参数需要设置为TRUE
+
+###########################################
+# Pools
+###########################################
+java_pool_size=115343360 JAVA池的大小为115343360/1024/1024=110(MB)
+large_pool_size=52428800 大池的大小为52428800、1024、1024=50(MB)
+shared_pool_size=524288000 共享池的大小为524288000/1024/1024=500(MB)
+
+###########################################
+# Processes and Sessions
+###########################################
+cpu_count=12 ？？？
+processes=1000 指定可以同时连接到一个Oracle Server上的操作系统用户进程的最大数量为1000个
+sessions=800 指定可以同时连接到一个Oracle Server上的操作系统用户数(会话数，SESSION)为800
+
+###########################################
+# Redo Log and Recovery 重做日志与恢复
+###########################################
+fast_start_mttr_target=300 指定从单个数据库例程崩溃中恢复所需的时间为300秒
+
+###########################################
+# Security and Auditing
+###########################################
+remote_login_passwordfile=EXCLUSIVE oracle安全验证是以口令文件方式，此参数将配合sqlnet.ora文件的SQLNET.AUTHENTICATION_SERVICES一起来决定数据库的验证方式
+
+###########################################
+# Sort, Hash Joins, Bitmap Indexes
+###########################################
+pga_aggregate_target=25165824 此参数用来指定session(会话)总计可以使用最大PGA内存
+sort_area_size=524288000 排序区大小500(MB)
+
+###########################################
+# Standby Database 备份数据库
+###########################################
+standby_file_management=auto ？？？
+
+###########################################
+# System Managed Undo and Rollback Segments
+###########################################
+undo_management=AUTO 设置回滚段为自动管理
+undo_retention=10800 指定UNDO信息在重做日志表保留的最低时间10800秒，当时间上过期的时候，所占用的段会被释放用于其它用途，如果没有其它事务，段没有被释放，自然可以回退到更早的时候
+undo_tablespace=UNDOTBS1 指定回滚表空间为UNDOTBS1
+
+*.db_recovery_file_dest='D:\app\Administrator\flash_recovery_area'
+*.db_recovery_file_dest_size=4039114752
+

@@ -1,0 +1,34 @@
+一致性备份（冷备份）：
+	正常关闭数据后的备份所有的数据文件和控制文件。
+	SQL：1. select name from v$datafile
+		UNION
+		SELECT NAME FROM V$CONTROLFILE
+		2.SHUTDOWN IMMEDIAte
+		3.执行HOST COPY 所有数据文件操作
+			HOST COPY D:\ORACLE\ORADATA\ORCL\*.CTL E:\oracleBackup\controlfile
+			HOST COPY D:\ORACLE\ORADATA\ORCL\*.dbf E:\oracleBackup\DATAFILE
+		4.startup open;
+非一致性备份(热备份)：
+	数据库在OPEN状态下的备份。
+	SQL：1. select name from v$datafile
+		UNION
+		SELECT NAME FROM V$CONTROLFILE
+		2.ALTER DATABASE BEGIN BACKUP;
+		3.HOST COPY D:\ORACLE\ORADATA\ORAC\*.dbf E:\oracleBackup\DATAFILE
+		  ALTER DATABASE BACKUP CONTROLFILE TO  'E:\oracleBackup\controlfile\demo.ctl';
+		4.ALTER DATABASE END BACKUP;
+		5.alter system archive log current;//归档当前日志组
+备份表空间：
+	脱机备份：
+		1select name from v$tablespace
+		2select file_name from dba_data_files where tablespace_name='USERS';
+		3alter tablespace 'USERS' offline
+		4HOST COPY D:\ORACLE\ORADATA\ORACLE\users01.dbf E:\oracleBackup\DATAFILE
+		5alter tablespace 'USERS' ONOLINE
+	联机备份：
+		ALTER DATABASE BEGIN BACKUP;
+		HOST COPY D:\ORACLE\ORADATA\ORACLE\users01.dbf E:\oracleBackup\DATAFILE；
+		ALTER DATABASE END BACKUP;
+
+ 
+			

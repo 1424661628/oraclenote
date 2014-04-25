@@ -1,0 +1,13 @@
+启动例程：
+	数据库启动例程的3个步骤
+		启动例程（NOMOUNT状态）：读取参数文件，分配SGA和启动后台进程。
+		装载数据库（MOUNT状态）:根据初始化参数control_files的设置打开控制文件，然后从控制文件中获取数据文件和重做日志的信息。
+		打开数据库（OPEN状态）：打开数据库，ORACLE打开所有数据文件和重做日志。
+T-SQL：STARTUP [NOMOUNT|MOUNT|OPEN|RESTRICT（普通用户不能访问,restricted session 权限，才可登录到数据库。）]
+停止例程：
+T-SQL:shutdowm abort | immediate | transactional | normal (shutdown不带参数将缺省为normal)
+    关闭选项：
+       normal:不准许新的连接，等待当前的session 结束，等待当前的事务结束，强制检查点并关闭文件
+       transactional:不准许新的连接，不等待当前的session结束，等待当前的事务结束，强制检查点并关闭文件。
+       immediate:不准许新的连接，不等待当前的session结束，不等待当前的事务结束，强制检查点并关闭文件。
+       abort:不准许新的连接，不等待当前的session结束，不等待当前的事务结束，不作强制检查点。

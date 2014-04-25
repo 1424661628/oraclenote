@@ -1,0 +1,22 @@
+行级别恢复
+	host date;2011/07/6
+	host time;16:38:36;
+	delete from scott.emp where deptno=30;
+	select ename from scott.emp as of timestamp to_timestamp('2011/07/6 16:38:36','YYYY-MM-DD HH24:MI:SS') where deptno=30;
+	insert into scott.emp select * from scott.emp as of timestamp to_timestamp('2011/07/6 16:38:36','YYYY-MM-DD HH24:MI:SS') where deptno=30;
+表级别恢复
+	host date;2011/07/06
+	host time;18:29:59;
+	delete from scott.emp where deptno=30;
+	flashback table scott.emp to  timestamp to_timestamp('2011/07/06 18:29:59','YYYY-MM-DD HH24:MI:SS');
+恢复被误删除的表
+     SQL> drop table scott.emp;
+      SQL>  select  object_name,t.original_name from dba_recyclebin t  在普通用户中 可以使用show recyclebin
+
+     OBJECT_NAME                    ORIGINAL_NAME                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+	------------------------------ --------------------------------                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+	BIN$4SJcLivJQZWymwCgUdwAbg==$0 PK_EMP                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+	BIN$r8GmBOFIRzSpaH6KdIE88A==$0 EMP     --这个就是刚才被删除的表
+	SQL>  FLASHBACK TABLE "BIN$r8GmBOFIRzSpaH6KdIE88A==$0" to before drop;   不能在sys或者system账户中使用
+	
+	

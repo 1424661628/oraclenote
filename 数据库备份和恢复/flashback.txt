@@ -1,0 +1,63 @@
+recovery area的位置，这个变化在笔者测试过程中观察不到) 
+?	闪回日志 
+?	控制文件和 SPFILE 自动备份 
+?	RMAN 备份集 
+?	数据文件拷贝 
+为何要用闪回恢复区?
+如前所述，闪回恢复区提供了一个集中化的存储区域，很大程度上减小了管理开销。这是其最主要的优点。与 RMAN 结合使用可以进行快速恢复。
+近年来随着存储技术的发展，单个磁盘的存储能力已经加强。这使自动的基于磁盘的备份与恢复的技术实现成为可能。而闪回恢复区恰是基于磁盘的备份与恢复的基础。把闪回恢复区和 OMF 与 ASM 结合运用看起来是比较完美的方案。当然，不可否认的是，自动备份恢复技术还远远不够成熟。
+
+调整如下两个动态初始化参数(无需重新启动实例)：
+SQL> ALTER SYSTEM SET db_recovery_file_dest_size=2g SCOPE=BOTH;
+SQL> ALTER SYSTEM SET db_recovery_file_dest='/u01/app/oracle/flash_recovery_area'
+  2  SCOPE=BOTH;
+SQL>
+之后查看所作的修改是否生效： 
+SQL> SHOW parameter db_recovery_file_dest
+
+
+      show parameter db_rec
+
+     select * from v$recovery_file_dest;
+      select * from v$flash_recovery_area_usage;
+
+
+开启flashback
+1-开启归档功能，使数据库处于归档模式下
+ 先关闭数据库：shutdown  immediate
+ 启动到mount状态：startup mount
+ 开启归档功能：alter database archivelog;
+ 打开数据库：alter database open;
+2-开启闪回flashback功能（归档下才可开启数据库闪回）
+ 查看flashback是否开启：select  name,flashback_on from v$database;
+ 查看闪回恢复区及大小是否设置：show parameter db_recovery；（如果已设置，下面2步可以省略）
+ 先设置闪回恢复区的大小：alter system set db_recovery_file_dest_size='2G';（这里系统默认也是2G，也未改）
+ 再设置闪回恢复区路径：alter system set db_recovery_file_dest='/u01/oracle/db_recovery_file_dest';(这步我并未使用)
+ 设置数据库回退的时间，默认1440分钟为一天时间：alter system set db_flashback_retention_target = 1440；
+ 先关闭数据库：shutdown immediate;
+ 启动到mount状态：startup mount;
+ 开启flashback功能：alter database flashback on；
+ 打开数据库：alter database open;
+
+行级别恢复
+	host date;2011/07/6
+	host time;16:38:36;
+	delete from scott.emp where deptno=30;
+	select ename from scott.emp as of timestamp to_timestamp('2011/07/6 16:38:36','YYYY-MM-DD HH24:MI:SS') where deptno=30;
+	insert into scott.emp select * from scott.emp as of timestamp to_timestamp('2011/07/6 16:38:36','YYYY-MM-DD HH24:MI:SS') where deptno=30;
+表级别恢复
+	host date;2011/07/06
+	host time;18:29:59;
+	delete from scott.emp where deptno=30;
+	flashback table scott.emp to  timestamp to_timestamp('2011/07/06 18:29:59','YYYY-MM-DD HH24:MI:SS');
+恢复被误删除的表
+     SQL> drop table scott.emp;
+      SQL>  select  object_name,t.original_name from dba_recyclebin t  在普通用户中 可以使用show recyclebin
+
+     OBJECT_NAME                    ORIGINAL_NAME                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+	------------------------------ --------------------------------                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+	BIN$4SJcLivJQZWymwCgUdwAbg==$0 PK_EMP                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+	BIN$r8GmBOFIRzSpaH6KdIE88A==$0 EMP     --这个就是刚才被删除的表
+	SQL>  FLASHBACK TABLE "BIN$r8GmBOFIRzSpaH6KdIE88A==$0" to before drop;   不能在sys或者system账户中使用
+	
+	

@@ -1,0 +1,69 @@
+RMAN使用 
+         RMAN TARGET scott/scott@orcl_192.168.0.5 nocatalog  ---无恢复目录
+	 RMAN TARGET scott/scott@orcl_192.168.0.5 catalog rman/rman@orcl_192.168.0.5
+RMAN命令
+	独立命令：startup ,backup format 'd:\backup\%d_%d.bak' tablespace user1;
+	作业命令：多个RMAN命令的组合。run{}
+	SQL命令：sql 'create tablespace uer01'
+	运行脚本：run{exec script s1;}
+	OS命令：run {host 'dir d:\demo';}
+配置通道：磁盘是DISK 磁带是SBT
+		1.配置通道并行度 也就是目标数据库端开几个服务线程来完成备份与恢复。
+		CONFIGURE DEVICE TYPE DISK PARALLELISM 3;
+		2.配置通道备份的文件格式：CONFIGURE CHANNEL DEVICE TYPE DISK FORMAT
+		'E:\oracleBackup\rmanbackup\%d_%s_%p.bak';（所有通道）
+		当然，也可以在运行块中，手工指定通道分配，这样的话，将取代默认的通道分配。 
+		Run{ 
+		allocate channel cq type disk format='/u01/backup/%u.bak' 
+		…… 
+		} 
+
+		如果是不同通道可以指定channel 1就可以配置通道1的格式
+		3.配置默认备份设备
+				configure default device type to disk;
+
+		4.配置备份集的最大尺寸
+		 configure MAXSETSIZE TO 1G；备份集大小
+		
+		 configure channel device type disk maxpiecesize 500M;--设置备份片的大小
+		5.配置多重备份
+		            configure datafile backup copies for device type disk to 3;
+		6.配置免除表空间(不备份此表空间)
+			configure exclude for tablespace user03;
+		7.配置冗余策略：(可以使得RMAN将早起备份标记为陈旧，过report obsolete命令就可以查看过期的备份集，可以使用delete obsolete删除陈旧备份)
+			configure retention policy to redundancy 2;
+			configure retention policy to recovery window of 3 days;
+			configure retention policy to redundancy 3;
+			configure retention policy clear;
+			备份策略保持
+			分为两个保持策略，一个是时间策略，决定至少有一个备份能恢复到指定的日期，一个冗余策略，规定至少有几个冗余的备份。
+			CONFIGURE RETENTION POLICY TO RECOVERY WINDOW OF 5 DAYS;
+			CONFIGURE RETENTION POLICY TO REDUNDANCY 5;
+			CONFIGURE RETENTION POLICY TO NONE;
+			在第一个策略中，是保证至少有一个备份能恢复到Sysdate-5 的时间点上，之前的备份将标记为Obsolete。第二个策略中说明至少需要有三个冗余的备份存在，如果多余三个备份以上的备份将标记为冗余。NONE 可以把使备份保持策略失效，Clear 将恢复默认的保持策略
+    8.自动备份
+    CONFIGURE CONTROLFILE AUTOBACKUP ON;       
+		配置控制文件和参数文件自动备份，当数据库结构发生改变的时候，如果有这个设置那么ORACLE会自动备份控制文件和参数文件，同时我们运行backup database 的时候 ，也会备份控制文件和参数文件。
+显示RMAN配置：show all;
+		show default device type;
+		show channel for device type disk;
+
+		1.01 RMAN> show all;
+		1.02 查询RMAN设置中非默认值:
+		SQL> select name,value from v$rman_configure;
+
+		
+		
+		二、相关术语解释
+1）Backup sets 备份集
+备份集顾名思义就是一次备份的集合，它包含本次备份的所有备份片，以oracle专有的格式保存。一个备份集根据备份的类型不同，可能构成一个完全备份或增量备份。
+2）Backup pieces 备份片
+一个备份集由若干个备份片组成。每个备份片是一个单独的输出文件。一个备份片的大小是有限制的；如果没有大小的限制， 备份集就只由一个备份片构成。备份片的大小不能大于你的文件系统所支持的文件长度的最大值。
+3）Image copies 映像备份
+映像备份不压缩、不打包、直接COPY 独立文件（数据文件、归档日志、控制文件），类似操作系统级的文件备份。而且只能COPY 到磁盘，不能到磁带。可以作为增量备份的0级，一般用来备份控制文件。
+4）Full backup 全备份
+全备份是指对数据文件中使用过的数据块进行备份，没有使用过的数据块是不做备份的，也就是说，RMAN 进行备份是进行压缩的。
+5）Incremental backup 增量备份
+增量备份是指备份数据文件中自从上一次同一级别的或更低级别的备份以来被修改过的数据块。与完全备份相同，增量备份也进行压缩。增量备份虽然概念很好，备份也很简单，但恢复起来却是另外一回事，不仅麻烦而且容易出错，所以实际中越来越少使用，到了Oracle 9i已经建议不再使用，以后版本会逐渐取消对增量备份的支持。
+6）Recovery catalog 恢复目录
+恢复目录用于记录RMAN 使用过程中的控制信息，恢复目录应该经常被同步（这在后面会讲到）。尽管我们可以使用nocatalog 方式来使用RMAN，此时控制信息记录在目标数据库的控制文件中，但这样毕竟不安全，因为一旦目标数据库的控制文件损坏就意味着所有的RMAN 备份失效。同

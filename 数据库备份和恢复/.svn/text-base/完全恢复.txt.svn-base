@@ -1,0 +1,55 @@
+转移数据文件：
+	MOUNT状态(该命令主要用于更改system表空间)：
+	  HOST COPY D:\ORACLE\ORADATA\ORACLE\system1.dbf  E:\oracleBackup\DATAFILE\system1.dbf
+	  ALTER DATABASE RENAME 'D:\ORACLE\ORADATA\ORACLE\system.dbf' TO  'E:\oracleBackup\DATAFILE\system.dbf'
+	OPEN状态（不能更改system表空间）
+		ALTER TABLESPACE 'NAME' OFFLINE
+		MOVE '路径' ‘路径’
+		alter TABLESPACE 'NAME' RENAME datafile '旧文件全路径' tO ‘新文件全路径’ 
+		ALTER TABLESPACE 'NAME' online
+完全恢复命令：
+       在OPEN状态 下数据文件丢失或者损坏 
+                   --------------------------
+			SQL> select * from demo.fff
+			  2  ;
+			select * from demo.fff
+					   *
+			第 1 行出现错误: 
+			ORA-00376: 此时无法读取文件 6
+			ORA-01110: 数据文件 6: 'D:\ORACLE\ORADATA\ORCL\DEMO.DBF' 
+		-----------------------------------------
+
+		1.recover database
+		2.recover tablespace user
+		3.recover datafile '路径'
+		4.或者采用 recover datafile 1,2
+		5.应用归档日志恢复 recover from '归档日志路径' datafile 1,2
+
+       在open状态 关闭后意外丢失的文件
+               第 1 行出现错误: 
+			ORA-00376: 此时无法读取文件 6
+			ORA-01110: 数据文件 6: 'D:\ORACLE\ORADATA\ORCL\DEMO.DBF' 
+         startup force mount;
+	 alter database datafile 6 offline;
+	 alter database open;
+	 alter database rename file '旧' to '新';  //或者从别的备份拷贝过来也可以(用host copy)
+	 recover datafile 6;
+	 alter database file 6 online;
+
+	 在open状态 打开后意外丢失的文件
+               第 1 行出现错误: 
+			ORA-00376: 此时无法读取文件 6
+			ORA-01110: 数据文件 6: 'D:\ORACLE\ORADATA\ORCL\DEMO.DBF' 
+	 alter database datafile 6 offline;
+	 alter database rename file '旧' to '新';  //或者从别的备份拷贝过来也可以(用host copy)
+	 recover datafile 6;
+	 alter database file 6 online;
+
+	 恢复未备份文件
+	  startup force mount;
+	 alter database datafile 6 offline;
+	 alter database open;
+
+	 alter database create datafile '源路径'； 如果磁盘算坏 alter database create datafile '源路径' to '新路径'
+	 recover datafile 6;
+	 alter database file 6 online;

@@ -1,0 +1,130 @@
+ Sqlplus 的打开方式： 
+1.       sqlplus  直接以DOS界面的形式打开
+
+2.       sqlplusw 以窗口的形式打开
+
+ 
+
+sqlplus的环境设置
+
+1.    set linesize  设置每行显示的长度
+
+2.    set pagesize  设置每页显示的长度  oracle中的数据是采用一页页显示的方式输出的
+
+但是上面的设置方式是通过命令行的形式设置的 可以采用一劳永逸的方法 ：
+
+找到oracle\product\10.1.0\db_1\sqlplus\admin\下的glogin文件 打开在最后加入以下命令：
+
+--定义缓冲编辑器为vi
+define_editor=vi
+--使DBMS_OUTPUT有效,并设置成最大buffer,并防止"吃掉"最前面的空格
+set serveroutput on size 1000000 format wrapped
+--设置一行可以容纳的字符数
+set linesize 256 
+--设置一页有多少行数
+set pagesize 50
+--设置来回数据显示量,这个值会影响autotrace时一致性读等数据
+set arraysize 5000
+--页和页之间不设任何间隔
+set newpage none
+--LONG或CLOB显示的长度
+set long 5000
+--将SPOOL输出中每行后面多余的空格去掉
+set trimspool on 
+--设置查询耗时
+set timing on 
+--autotrace后explain plan output的格式
+col plan_plus_exp format a120
+--在屏幕上暂不显示输出的内容,为下面的设置sql做准备
+set termout off 
+--设置时间格式
+alter session set nls_date_format='yyyy-mm-dd hh24:mi:ss';
+--获得用户名和global_name
+col login_info_temp new_value login_info
+select user||'@'||global_name login_info_temp from global_name;
+--设置sql提示为"user@global_name"
+set sqlprompt '&login_info SQL> '
+--在屏幕上显示输出的内容
+set termout on
+--列格式控制
+col c1 format a1
+col cc1 format a1
+col c2 format a2
+col cc2 format a2
+col c3 format a3
+col cc3 format a3
+col c4 format a4
+col cc4 format a4
+col c5 format a5
+col cc5 format a5
+col c6 format a6
+col cc6 format a6
+col c7 format a7
+col cc7 format a7
+col c8 format a8
+col cc8 format a8
+col c9 format a9
+col cc9 format a9
+col c10 format a10
+col cc10 format a10
+col c15 format a15
+col cc15 format a15
+col c20 format a20
+col cc20 format a20
+col c30 format a30
+col cc30 format a30
+col c40 format a40
+col cc40 format a40
+col c50 format a50
+col cc50 format a50
+col c60 format a60
+col cc60 format a60
+col c70 format a70
+col cc70 format a70
+col c80 format a80
+col cc80 format a80
+col c90 format a90
+col cc90 format a90
+col c100 format a100
+col cc100 format a100
+col c150 format a150
+col cc150 format a150
+col c200 format a200
+col cc200 format a200
+col c255 format a255
+col cc255 format a255
+col host format a30
+col db_link format a30
+col host format a30
+col db_link format a30
+col member format a60
+col name format a60
+col owner format a15
+col what format a90
+col DEST_NAME format a30
+col OS_USERNAME format a15
+col USERNAME format a15
+col USERHOST format a15
+col TERMINAL format a15
+col OBJ_NAME format a30
+col SQL_TEXT format a60
+col EVENT format a70
+col status format a60
+col MESSAGE format a100
+col path format a30
+col FILE_NAME format a60
+col DESTINATION format a50
+col OBJECT_NAME format a30
+------------------------------------------------------------
+--End--
+
+   在sqlplusw中不能通过方向键来修改SQL语句 一般SQL语句是写在文本文档中的 可以使用以下的命令
+
+1．ed a      表示创建一个名为 a 的文档  可以在其中写SQL语句 并可做修改
+
+2．@ a      打开文档 a  如果里面是符合条件的SQL语句 则会执行 否则会报错
+
+3．@ 文件路径  可以打开指定目录下的文件 如果该文件后缀名是 .sql则无需输入后缀名也能找到 如果是非sql文件 则需加后缀名 例如.txt 里面是SQL语句则会执行 否则报错
+
+例：e盘下有 a.sql  和  b.txt文件  要找到此文件   @e:a     @e:b.txt
+

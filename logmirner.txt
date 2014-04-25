@@ -1,0 +1,230 @@
+一、logminer的用途
+
+　　日志文件中存放着所有进行数据库恢复的数据，记录了针对数据库结构的每一个变化，也就是对数据库操作的所有DML语句。
+
+　　logminer 工具即可以用来分析在线，也可以用来分析离线日志文件，即可以分析本身自己数据库的重作日志文件，也可以用来分析其他数据库的重作日志文件。
+
+　　总的说来，logminer工具的主要用途有：
+
+　　　1． 跟踪数据库的变化：可以离线的跟踪数据库的变化，而不会影响在线系统的性能。
+
+　　　2． 回退数据库的变化：回退特定的变化数据，减少point-in-time recovery的执行。
+
+　　　3． 优化和扩容计划：可通过分析日志文件中的数据以分析数据增长模式。
+
+ 二、安装logminer
+
+　　要安装logminer工具，必须首先要运行下面这样两个脚本，
+
+　　　l $ORACLE_HOME/rdbms/admin/dbmslm.sql
+
+　　　2 $ORACLE_HOME/rdbms/admin/dbmslmd.sql
+
+　　这两个脚本必须均以SYS用户身份运行。其中第一个脚本用来创建DBMS_LOGMNR包，该包用来分析日志文件。第二个脚本用来创建DBMS_LOGMNR_D包，该包用来创建数据字典文件。
+
+ 三、使用logminer工具
+
+　　下面将详细介绍如何使用logminer工具。
+
+　　1、创建数据字典文件（data-dictionary）
+
+　　前面已经谈到，logminer工具实际上是由两个新的PL/SQL内建包（(DBMS_LOGMNR 和 DBMS_ LOGMNR_D)和四个V$动态性能视图（视图是在利用过程DBMS_LOGMNR.START_LOGMNR启动logminer时创建）组成。在使用logminer工具分析redo log文件之前，必须使用DBMS_LOGMNR_D 包将数据字典导出为一个文本文件。该字典文件是可选的，但是如果没有它，logminer解释出来的语句中关于数据字典中的部分（如表名、列名等）和数值都将是16进制的形式，我们是无法直接理解的。例如，下面的sql语句： INSERT INTO dm_dj_swry (rydm, rymc) VALUES (00005, '张三'); logminer解释出来的结果将是下面这个样子， insert into Object#308(col#1, col#2) values (hextoraw('c30rte567e436'), hextoraw('4a6f686e20446f65'));
+
+ 　　创建数据字典的目的就是让logminer引用涉及到内部数据字典中的部分时为他们实际的名字，而不是系统内部的16进制。数据字典文件是一个文本文件，使用包DBMS_LOGMNR_D来创建。如果我们要分析的数据库中的表有变化，影响到库的数据字典也发生变化，这时就需要重新创建该字典文件。另外一种情况是在分析另外一个数据库文件的重作日志时，也必须要重新生成一遍被分析数据库的数据字典文件。
+
+ 　　首先指定数据字典文件的位置，也就是添加一个参数UTL_FILE_DIR，该参数值为服务器中放置数据字典文件的目录,这里我们假定目录为：f\logminer,以sys用户登录，运行以下命令：
+
+alter system set UTL_FILE_DIR ='f:\logminer' scope=spfile;
+
+shutdown immediate  "关闭数据库
+
+startup             "重新启动数据库，使新加的参数生效，然后创建数据字典文件：
+
+ SQL> CONNECT SYS
+
+SQL> EXECUTE dbms_logmnr_d.build( 'dictionary.ora', 'f:\logminer');
+
+ 　2、创建要分析的日志文件列表
+
+　　Oracle的重作日志分为两种，在线（online）和离线（offline）归档日志文件，下面就分别来讨论这两种不同日志文件的列表创建。
+
+　　（1）分析在线重作日志文件
+
+A.     查询在线日志文件
+
+select * from v$log   //根据显示结果可知当前日志的组号为1
+
+    GROUP#  SEQUENCE# ARCHIVED STATUS
+
+---------- ---------- -------- ----------------
+
+         1          7 NO       CURRENT
+
+         2          3 YES      INACTIVE
+
+         3          6 YES      INACTIVE
+
+         4          4 YES      INACTIVE
+
+         5          5 YES      INACTIVE
+
+select * from v$logfile  //根据组号可以找到对应的日志文件为red0o1.log
+
+　　   GROUP# STATUS  TYPE    MEMBER
+
+---------- ------- ------- --------------------------------------------------------------------------------
+
+         1         ONLINE  F:\ORACLE\ORADATA\SZGOV92\REDO01.LOG
+ 2         ONLINE  F:\ORACLE\ORADATA\SZGOV92\REDO02.LOG
+
+         3         ONLINE  F:\ORACLE\ORADATA\SZGOV92\REDO03.LOG
+
+         4         ONLINE  F:\ORACLE\ORADATA\SZGOV92\REDO04.LOG
+
+         5         ONLINE  F:\ORACLE\ORADATA\SZGOV92\REDO05.LOG
+
+B. 创建列表
+
+SQL> EXECUTE dbms_logmnr.add_logfile('D:\ORACLE\ORADATA\ORCL\REDO03.LOG', dbms_logmnr.new);
+
+ C. 添加其他日志文件到列表
+
+SQL> EXECUTE dbms_logmnr.add_logfile('F:\ORACLE\ORADATA\SZGOV92\REDO02.LOG', dbms_logmnr.addfile);
+
+ D．删除列表中的日志文件
+
+SQL> EXECUTE dbms_logmnr.add_logfile('F:\ORACLE\ORADATA\SZGOV92\REDO02.LOG', dbms_logmnr.remove);
+
+（2）分析离线日志文件
+
+　　A.创建列表
+
+SQL> EXECUTE dbms_logmnr.add_logfile(
+
+' e:\Oracle\oradata\szgov92\archive\ARCARC09108.001', dbms_logmnr.new);
+
+ 　　B.添加另外的日志文件到列表
+
+SQL> EXECUTE dbms_logmnr.add_logfile(
+
+' e:\Oracle\oradata\szgov92\archive\ARCARC09109.001', dbms_logmnr.addfile);
+
+ 　　关于这个日志文件列表中需要分析日志文件的个数完全由你自己决定，但这里建议最好是每次只添加一个需要分析的日志文件，在对该文件分析完毕后，再添加另外的文件。
+
+3、使用logminer进行日志分析
+
+　　（1）无限制条件
+
+SQL> EXECUTE dbms_logmnr.start_logmnr( DictFileName=>'D:\Oracle\logminer\dictionary.ora ');
+
+ 　　（2）有限制条件
+
+　　通过对过程DBMS_ LOGMNR.START_LOGMNR中几个不同参数的设置（参数含义见表1），可以缩小要分析日志文件的范围。通过设置起始时间和终止时间参数我们可以限制只分析某一时间范围的日志。如下面的例子，我们仅仅分析2004年9月18日的日志，：
+
+SQL> EXECUTE dbms_logmnr.start_logmnr(
+
+DictFileName => 'D:\Oracle\logminer\dictionary.ora',
+
+StartTime => to_date('2006-02-13 00:00:00','YYYY-MM-DD HH24:MI:SS')
+
+EndTime => to_date(''2004-9-18 23:59:59','YYYY-MM-DD HH24:MI:SS '));
+
+ 　　也可以通过设置起始SCN和截至SCN来限制要分析日志的范围：
+
+SQL> EXECUTE dbms_logmnr.start_logmnr(DictFileName => ' f:\logminer\dictionary.ora',
+
+StartScn => 20, EndScn => 50);
+
+
+4、观察分析结果（v$logmnr_contents）
+
+   一共有四个表，详细说明如下
+
+V$LOGMNR_DICTIONARY-------查询使用的数据字典文件
+
+V$LOGMNR_PARAMETERS-------查询当前LogMiner设定的参数
+
+V$LOGMNR_LOGS-------查询分析的日志文件
+
+V$LOGMNR_CONTENTS-------日志文件的内容
+
+到现在为止，我们已经分析得到了重作日志文件中的内容。动态性能视图v$logmnr_contents包含logminer分析得到的所有的信息。
+
+SELECT scn,timestamp,sql_redo FROM  v$logmnr_contents;
+
+　　如果我们仅仅想知道某个用户对于某张表的操作，可以通过下面的SQL查询得到，该查询可以得到用户DB_ZGXT对表SB_DJJL所作的一切工作。
+
+SQL> SELECT sql_redo FROM v$logmnr_contents WHERE username='DB_ZGXT' AND seg_name='SB_DJJL';
+
+　　需要强调一点的是，视图v$logmnr_contents中的分析结果仅在我们运行过程'dbms_logmrn.start_logmnr'这个会话的生命期中存在。这是因为所有的logminer存储都在PGA内存中，所有其他的进程是看不到它的，同时随着进程的结束，分析结果也随之消失。
+
+　　最后，使用过程DBMS_LOGMNR.END_LOGMNR终止日志分析事务，此时PGA内存区域被清除，分析结果也随之不再存在。
+
+　　四、其他注意事项
+
+ 　　我们可以利用logminer日志分析工具来分析其他数据库实例产生的重作日志文件，而不仅仅用来分析本身安装logminer的数据库实例的redo logs文件。使用logminer分析其他数据库实例时，有几点需要注意：
+
+ 　　1. logminer必须使用被分析数据库实例产生的字典文件，而不是安装logminer的数据库产生的字典文件，另外必须保证安装logminer数据库的字符集和被分析数据库的字符集相同。
+
+ 　　2. 被分析数据库平台必须和当前logminer所在数据库平台一样，也就是说如果我们要分析的文件是由运行在UNIX平台上的Oracle 9i产生的，那么也必须在一个运行在UNIX平台上的Oracle实例上运行logminer，而不能在其他如Microsoft NT上运行logminer。当然两者的硬件条件不一定要求完全一样。
+
+ 　　3. logminer日志分析工具仅能够分析Oracle 8以后的产品，对于8以前的产品，该工具也无能为力。
+
+ 　　五、结语
+
+　　logminer对于数据库管理员（DBA）来讲是个功能非常强大的工具，也是在日常工作中经常要用到的一个工具，借助于该工具，可以得到大量的关于数据库活动的信息。其中一个最重要的用途就是不用全部恢复数据库就可以恢复数据库的某个变化。另外，该工具还可用来监视或者审计用户的活动，如你可以利用logminer工具察看谁曾经修改了那些数据以及这些数据在修改前的状态。我们也可以借助于该工具分析任何Oracle 8及其以后版本产生的重作日志文件。另外该工具还有一个非常重要的特点就是可以分析其他数据库的日志文件。总之，该工具对于数据库管理员来讲，是一个非常有效的工具，深刻理解及熟练掌握该工具，对于每一个数据库管理员的实际工作是非常有帮助的。
+
+补充一下Oracle9i LogMiner的增强功能：
+
+1、支持更多数据/存储类型：链接/迁移行、CLUSTER表操作、DIRECT PATH插入以及DDL操作。在V$LOGMNR_CONTENTS的SQL_REDO中可以看到DDL操作的原句（CREATE USER除外，其中的密码将以加密的形式出现，而不是原始密码）。如果TX_AUDITING初始化参数设为TRUE，则所有操作的数据库账号将被记录。
+
+2、提取和使用数据字典的选项：现在数据字典不仅可以提取到一个外部文件中，还可以直接提取到重做日志流中，它在日志流中提供了操作当时的数据字典快照，这样就可以实现离线分析。
+
+3、允许对DML操作按事务进行分组：可以在START_LOGMNR()中设置COMMITTED_DATA_ONLY选项，实现对DML操作的分组，这样将按SCN的顺序返回已经提交的事务。
+
+4、支持SCHEMA的变化：在数据库打开的状态下，如果使用了LogMiner的DDL_DICT_TRACKING选项，Oracle9i的LogMiner将自动对比最初的日志流和当前系统的数据字典，并返回正确的DDL语句，并且会自动侦察并标记当前数据字典和最初日志流之间的差别，这样即使最初日志流中所涉及的表已经被更改或者根本已经不存在，LogMiner同样会返回正确的DDL语句。
+
+5、在日志中记录更多列信息的能力：例如对于UPDATE操作不仅会记录被更新行的情况，还可以捕捉更多前影信息。
+
+6、支持基于数值的查询：Oracle9i LogMiner在支持原有基于元数据（操作、对象等）查询的基础上，开始支持基于实际涉及到的数据的查询。例如涉及一个工资表，现在我们可以很容易地查出员工工资由1000变成2000的原始更新语句，而在之前我们只能选出所有的更新语句。
+
+利用logminer以及登陆触发器实现对Oracle数据操作追踪
+
+实现方式比较简单：
+ 创建用户登陆数据库的触发器，使用工具包记载客户端登陆的ip，使用logminer分析相关的归档文件以及联机重做日志，查找恶意删除数据的客户端信息。
+条件：  以sys用户执行如下脚本
+创建相关脚本：
+create table login_log
+(
+SID NUMBER(16),   
+SERIAL NUMBER(16),   
+MACHINE VARCHAR2(64) ,
+OSUSER VARCHAR2(30),   
+USERNAME VARCHAR2(30),
+PROGRAM VARCHAR2(48),
+LOGINTIME DATE
+);
+
+create or replace trigger logon_trigger
+after logon on database
+declare
+LPRG VARCHAR2(48);
+LUSERNAME varchar2(30);
+LOSUSER   varchar2(30);
+LMACHINE  varchar2(64);
+LSID pls_integer;
+LSERIAL pls_integer;
+begin
+--在会话信息中增加客户端ip地址
+dbms_application_info.set_client_info(sys_context('userenv', 'ip_address'));
+select sid,serial#,machine,osuser,program,username
+into LSID,LSERIAL,LMACHINE,LOSUSER,LPRG,LUSERNAME from v$session
+where sid=(select sid from v$mystat where rownum<2);
+insert into login_log(sid,serial,machine,osuser,username,program,logintime)
+values (LSID,LSERIAL,LMACHINE,LOSUSER,LUSERNAME,LPRG,sysdate);end;
+
+分析相关日志时，通过v$logmnr_contents视图中session_info字段中的信息可以查找到相关信息。
+类似如下的sql:
+     select session_info,sql_redo from v$logmnr_contents where  sql_redo like '%drop%';
+ 
+

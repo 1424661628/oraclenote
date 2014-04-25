@@ -1,0 +1,49 @@
+不完全恢复
+		基于时间
+			SQL>HOST DATE  2011/07/05
+			SQL>HOST TIME   22:10:12.71
+			SQL>TRUNCATE TABLE SCOTT.EMP  //表被误删除
+			c:\>set nls_date_format=yyyy-mm-dd hh24:mi:ss
+			c:\>rman 
+			RMAN>connect  target sys/sys
+			
+			RMAN>connect catalog rman/rman
+			RMAN>run {
+				startup force mount;
+			     set until time='2011-07-05 22:10:12';
+			     restore database;
+			     recover database;
+			     sql 'alter databse open resetlogs';  --复位日志序列号
+			     }
+			--进行不完全恢复完 应该及时备份数据库
+			RMAN>run {
+			     delete noprompt backup;
+			     delete noprompt copy;
+			     backup database format='路径‘；
+			     sql 'alter system archivelog current';  --复位日志序列号
+			     }
+		基于SCN
+			SQL>select current_scn from v$database;  1602862
+			SQL>drop table scott.emp;
+			c:\>rman 
+			RMAN>connect  target sys/sys
+			
+			RMAN>connect catalog rman/rman
+			RMAN>run
+				{
+				startup up force mount;
+				set until scn=1602862;
+				restore database;
+				reoover database;
+				sql 'alter databse open resetlogs';
+				}
+			RMAN>run {
+			     delete noprompt backup;
+			     delete noprompt copy;
+			     backup database format='路径‘；
+			     sql 'alter system archivelog current';  --复位日志序列号
+			     }
+		基于日志序列号恢复：
+		             把上面改为set until sequence=6; 
+
+

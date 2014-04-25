@@ -1,0 +1,21 @@
+查看数据库的日志模式
+SELECT LOG_MODE FROM V$DATABASE;
+显示归档日志信息 archive log list;
+select name,sequence#,first_change# from v$archived_log;
+select destination from v$archive_dest;
+改变数据库为 ARCHIVELOG模式 
+		SHUTDOWN IMMEDIATE
+		STARTUP MOUNT
+		ALTER DATABASE ARCHIVELOG
+		ALTER DATABASE OPEN
+配置归档日志进程  ALTER SYSTEM SET LOG_ARCHIVE_MAX_PROCESSES=3
+
+配置归档日志位置：1-2个时候 
+   			ALTER SYSTEM SET LOG_ARCHIVE_DEST='路径'；
+				ALTER SYSTEM SET LOG_ARCHIVE_duplex_DEST='路径'；
+		 配置多个：ALTER SYSTEM SET LOG_ARCHIVE_DEST=''；
+				ALTER SYSTEM SET LOG_ARCHIVE_duplex_DEST=''；
+				ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='location=路径'
+				ALTER SYSTEM SET LOG_ARCHIVE_DEST_2='location=路径'
+				ALTER SYSTEM SET LOG_ARCHIVE_DEST_3='location=路径'
+				ALTER SYSTEM SET LOG_ARCHIVE_DEST_4='service=standby'
