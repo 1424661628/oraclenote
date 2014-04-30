@@ -1,7 +1,5 @@
-show parameter control_files
-V$controlfile
-select value from v$parameter where name='control_files'
-
+控制文件（Control File）是Oracle的物理文件之一，它记录了数据库的物理结构（数据文件、日志文件等的名称和位置），数据库转载和打开都需要控制文件，
+还记录了日志序列号，检查点和日志历史信息，同步和恢复数据库都需要控制文件。
 控制文件包含以下信息：
      数据名称
      数据文件名称和位置
@@ -11,8 +9,53 @@ select value from v$parameter where name='control_files'
      检查点信息
      日志历史信息
      RMAN信息
+查询控制文件T-SQL：
+	SQL> col name format a30
+	SQL> select * from V$controlfile;
 
-多元化控制文件
+	STATUS         NAME                           IS_REC BLOCK_SIZE FILE_SIZE_BLKS  
+	-------------- ------------------------------ ------ ---------- --------------  
+		       /home/oracle_11/app/oradata/or NO          16384            594  
+		       cl/control01.ctl                                                 
+											
+		       /home/oracle_11/app/flash_reco NO          16384            594  
+		       very_area/orcl/control02.ctl                                     
+											
+		       /home/oracle_11/app/oradata/or NO          16384            594  
+		       cl/control03.ctl                                                 
+											
+
+	SQL> col value format a30
+	SQL> select name,type,value from v$parameter where name='control_files';
+
+	NAME                                 TYPE VALUE                                 
+	------------------------------ ---------- ------------------------------        
+	control_files                           2 /home/oracle_11/app/oradata/or        
+						  cl/control01.ctl, /home/oracle        
+						  _11/app/flash_recovery_area/or        
+						  cl/control02.ctl, /home/oracle        
+						  _11/app/oradata/orcl/control03        
+						  .ctl                                  
+											
+
+	SQL> show parameter control_files;
+
+	NAME                                 TYPE                                       
+	------------------------------------ ----------------------                     
+	VALUE                                                                           
+	------------------------------                                                  
+	control_files                        string                                     
+	/home/oracle_11/app/oradata/or                                                  
+	cl/control01.ctl, /home/oracle                                                  
+	_11/app/flash_recovery_area/or                                                  
+	cl/control02.ctl, /home/oracle                                                  
+	_11/app/oradata/orcl/control03                                                  
+	.ctl                                                                            
+
+
+
+ 
+多元化控制文件:因为控制文件非常重要所以DBA必须确保控制文件不会丢失或者损坏,所以建议采用2个或者2个以上的控制文件（最多支持8个），控制文件应该尽量放在不同的磁盘上。
   使用PFILE
    1.手动修改Pfile control_files=("D:\oracle\oradata\orcl\control01.ctl", "D:\oracle\oradata\orcl\control02.ctl", "D:\oracle\oradata\orcl\control03.ctl")
      shutdown immediate

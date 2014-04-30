@@ -1,3 +1,5 @@
+
+
 表空间信息  dba_tablespaces   v$tablespace   dba_data_files  v$datafile
 
 建立表空间
