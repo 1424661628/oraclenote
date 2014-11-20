@@ -1,0 +1,168 @@
+	DBMS_XPLAN包包括一系列函数，主要是用于显示SQL语句的执行计划，且不同的情形下使用不同的函数来显示，如预估的执行计划则使用
+display函数,而实际的执行计划则是用display_cursor函数，对于awr中的执行计划，则是用display_awr函数，而SQL tuning集合中的执行计划
+则由display_sqlset来完成(来自Leshami的dbms_xplan之display函数的使用)。
+
+函数语法：
+	DBMS_XPLAN.DISPLAY(
+	   table_name    IN  VARCHAR2  DEFAULT 'PLAN_TABLE',
+	   statement_id  IN  VARCHAR2  DEFAULT  NULL, 
+	   format        IN  VARCHAR2  DEFAULT  'TYPICAL',
+	   filter_preds  IN  VARCHAR2 DEFAULT NULL);
+
+display函数的参数说明
+        table_name    
+              指定计划表的名字，缺省值为 'PLAN_TABLE'.
+        statement_id  
+                SQL语句的ID号，是在生成执行计划时使用set statement_id名令设定的值，默认值为NULL,当使用默认值时，将显示最近
+                插入计划表中的执行计划(filter_preds参数的值为空时)
+        format   
+                用于控制display函数输出的内容。其常用取值为basic,typical,serial,all,advanced。其中typical为缺省值
+                除了上述几个取值外，还可以配合一些额外的修饰符来显示不同的内容。如：
+                        alias、bytes、cost、note、outline、parallel、paration、predicate等
+                常用取值组合修饰符的例子：
+                        basic +predicate、basic +outline(需要某个修饰符使用"+"号来连接)
+                        typical -bytes、typical +alias -bytes -cost(不需要某个修饰符使用"-"号来连接)
+                        注："+"号与"-"号前面应保留空格
+        filter_preds 
+                过滤谓词。用于过滤从plan_table表中返回的记录。当该值为NULL时，执行计划显示最近插入计划表中的执行计划。
+                        如：filter_preds=>'plan_id = 223'
+format参数常用值描述
+        basic     仅仅显示最少的信息。基本上包括操作和操作的对象
+        typical   显示大部分信息。基本上包括除了别名，提纲和字段投影外的所有信息，此为缺省值。
+        serial    类似于typical，但不显示并行操作
+        all          显示除提纲之外的所有信息
+        advanced     显示所有信息
+format参数修饰符
+        alias        控制包含查询块与别名的显示部分
+        bytes        控制执行计划表中字段bytes的显示
+        cost         控制执行计划表中字段cost的显示
+        note         控制包含注释信息的显示部分
+        outline      控制包含提纲信息的显示部分
+        parallel     控制包含并行处理信息的提示
+        partition    控制并行处理信息的显示，尤其是执行计划表中字段TQ、IN-OUT、PQ Distrib的显示
+        peeked_binds 控制包含绑定变量窥探部分的显示。仅当生成执行计划时使用了绑定变量是可见
+        predicate    控制包含谓词filter和access显示部分
+        projection   控制包含投影信息的显示部分
+        remote       控制远程执行的SQL语句的显示
+        rows         控制执行计划表中字段rows的显示
+
+使用演示：
+	SQL> EXPLAIN PLAN SET STATEMENT_ID='test' FOR SELECT * FROM   emp e, dept d WHERE  e.deptno = d.deptno AND    e.ename  = 'CLARK';
+
+	Explained.
+
+	SQL> SELECT *   FROM   TABLE(DBMS_XPLAN.DISPLAY('PLAN_TABLE','test','BASIC'));
+
+	PLAN_TABLE_OUTPUT
+	------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	Plan hash value: 3625962092
+
+	------------------------------------------------
+	| Id  | Operation		     | Name    |
+	------------------------------------------------
+	|   0 | SELECT STATEMENT	     |	       |
+	|   1 |  NESTED LOOPS		     |	       |
+	|   2 |   NESTED LOOPS		     |	       |
+	|   3 |    TABLE ACCESS FULL	     | EMP     |
+	|   4 |    INDEX UNIQUE SCAN	     | PK_DEPT |
+	|   5 |   TABLE ACCESS BY INDEX ROWID| DEPT    |
+
+	PLAN_TABLE_OUTPUT
+	------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	------------------------------------------------
+
+	12 rows selected.
+
+
+
+	SQL> SELECT *   FROM   TABLE(DBMS_XPLAN.DISPLAY('PLAN_TABLE','test','BASIC+predicate'));
+
+	PLAN_TABLE_OUTPUT
+	------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	Error: format 'BASIC+predicate' not valid for DBMS_XPLAN.DISPLAY()
+
+	SQL> SELECT *   FROM   TABLE(DBMS_XPLAN.DISPLAY('PLAN_TABLE','test','BASIC +predicate'));
+
+	PLAN_TABLE_OUTPUT
+	------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	Plan hash value: 3625962092
+
+	------------------------------------------------
+	| Id  | Operation		     | Name    |
+	------------------------------------------------
+	|   0 | SELECT STATEMENT	     |	       |
+	|   1 |  NESTED LOOPS		     |	       |
+	|   2 |   NESTED LOOPS		     |	       |
+	|*  3 |    TABLE ACCESS FULL	     | EMP     |
+	|*  4 |    INDEX UNIQUE SCAN	     | PK_DEPT |
+	|   5 |   TABLE ACCESS BY INDEX ROWID| DEPT    |
+
+	PLAN_TABLE_OUTPUT
+	------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	------------------------------------------------
+
+	Predicate Information (identified by operation id):
+	---------------------------------------------------
+
+	   3 - filter("E"."ENAME"='CLARK')
+	   4 - access("E"."DEPTNO"="D"."DEPTNO")
+
+	18 rows selected.
+
+
+
+	SQL> SELECT *   FROM   TABLE(DBMS_XPLAN.DISPLAY('PLAN_TABLE','test','typical'));
+
+	PLAN_TABLE_OUTPUT
+	------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	Plan hash value: 3625962092
+
+	----------------------------------------------------------------------------------------
+	| Id  | Operation		     | Name    | Rows  | Bytes | Cost (%CPU)| Time     |
+	----------------------------------------------------------------------------------------
+	|   0 | SELECT STATEMENT	     |	       |     1 |    58 |     4	 (0)| 00:00:01 |
+	|   1 |  NESTED LOOPS		     |	       |       |       |	    |	       |
+	|   2 |   NESTED LOOPS		     |	       |     1 |    58 |     4	 (0)| 00:00:01 |
+	|*  3 |    TABLE ACCESS FULL	     | EMP     |     1 |    38 |     3	 (0)| 00:00:01 |
+	|*  4 |    INDEX UNIQUE SCAN	     | PK_DEPT |     1 |       |     0	 (0)| 00:00:01 |
+	|   5 |   TABLE ACCESS BY INDEX ROWID| DEPT    |     1 |    20 |     1	 (0)| 00:00:01 |
+
+	PLAN_TABLE_OUTPUT
+	------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	----------------------------------------------------------------------------------------
+
+	Predicate Information (identified by operation id):
+	---------------------------------------------------
+
+	   3 - filter("E"."ENAME"='CLARK')
+	   4 - access("E"."DEPTNO"="D"."DEPTNO")
+
+	18 rows selected.
+
+
+
+	SQL> select * from table(dbms_xplan.display(null,null,'','id=1'));  --添加了过滤条件
+
+	PLAN_TABLE_OUTPUT
+	--------------------------------------------------------------------------------
+	Plan hash value: 3625962092
+
+	------------------------------
+	| Id  | Operation     | Name |
+	------------------------------
+	|   1 |  NESTED LOOPS |      |
+	------------------------------
+
+	Note
+	-----
+	   - rule based optimizer used (consider using cbo)
+
+	11 rows selected.
+
+
+总结
+        1、display函数仅仅针对预估的执行计划，而不是实际的执行计划
+        2、display函数显示了预估的执行计划且显示格式灵活，可以以不同的输出格式呈现
+        3、当所有参数为null的情况下，显示执行计划表中(缺省为plan_table)最后一条语句的执行计划
+        4、尽管可以通过SQL语句查询plan_table来获取执行计划，建议直接使用display函数，这足够说明一切问题    
+        5、当SQL语句中使用了绑定变量时，由explain plan获得的执行计划是不可靠的

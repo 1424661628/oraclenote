@@ -2,24 +2,60 @@
 重做日志组：由一个或者多个完全一样的重做日志文件组成，如果一个日志组有多个日志文件，后台进程LGWR会把事务变化写到同一个日志组的多个文件中。
 	每个数据库最少包括2个日志组，日志组可以循环使用。
 重做日志成员：日志组的每个文件都称为日志成员。
-v$LOGFILE 
+工作原理：当用户执行DDL或者DML操作的时候，Oracle进程会把操作记录（重做记录）写到重做日志高速缓冲区中，最后有后台进程LGWR写到重做日志中。
+	LGWR在以下情况会进行写入操作
+		提交事务
+		每隔3秒（默认）
+		重做日志缓冲区1/3写满
+		DBWR进程将脏数据写到数据文件之前
+增加日志：为了提高安全性和性能数据库管理员应该增加重做日志。
+T-SQL:查询
+	SQL> select thread#,instance,groups from v$thread;
 
-select GROUP#,MEMBER FROM V$LOGFILE;
+	   THREAD# INSTANCE										GROUPS
+	---------- -------------------------------------------------------------------------------- ----------
+		 1 orcl 										     3
 
-select * from v$logfile;
-select * from v$log
+	SQL> select * from v$logfile;
+
+	    GROUP# STATUS  TYPE    MEMBER				    IS_
+	---------- ------- ------- ---------------------------------------- ---
+		 3	   ONLINE  /home/oracle_11/app/oradata/orcl/redo03. NO
+				   log
+
+		 2	   ONLINE  /home/oracle_11/app/oradata/orcl/redo02. NO
+				   log
+
+		 1	   ONLINE  /home/oracle_11/app/oradata/orcl/redo01. NO
+				   log
+
+		 1 INVALID ONLINE  /home/oracle_11/app/oradata/orcl/redoC1. NO
+				   log
+
+	    GROUP# STATUS  TYPE    MEMBER				    IS_
+	---------- ------- ------- ---------------------------------------- ---
+
+
+	SQL> select group#,sequence#,members,status from v$log;
+
+	    GROUP#  SEQUENCE#	 MEMBERS STATUS
+	---------- ---------- ---------- ----------------
+		 1	   16	       2 INACTIVE
+		 2	   17	       1 INACTIVE
+		 3	   18	       1 CURRENT
 
 切换日志：alter system switch logfile;
-添加日志文件：ALTER DATABASE ADD LOGFILE 'E:\OracleRedoFile\redo04.log'
-              size 20  --(会自动创建一个日志组)
+添加日志组：ALTER DATABASE ADD LOGFILE '/home/oracle_11/app/oradata/orcl/redo04.log'
+            size 20M  --(会自动创建一个日志组)
+	   ALTER DATABASE ADD LOGFILE group 4 '/home/oracle_11/app/oradata/orcl/redo04.log' SIZE 20M
 
-	      ALTER DATABASE ADD LOGFILE group 4 'E:\OracleRedoFile\redo04.log' SIZE 20M
-添加日志成员：ALTER DATABASE ADD LOGFILE member  'E:\OracleRedoFile\redoB4.log' to GROUP 1, 'E:\OracleRedoFile\redoB5.log' TO GROUP2;
 
-删除日志组成员： ALTER DATABASE DROP LOGFILE member E:\OracleRedoFile\redoB5.log' --（不能删除当前日志组的成员 不然会出错）
+添加日志成员：ALTER DATABASE ADD LOGFILE member  '/home/oracle_11/app/oradata/orcl/redoB1.log' to GROUP 1, '/home/oracle_11/app/oradata/orcl/redoB2.log' TO GROUP 2;
+
+删除日志组成员： ALTER DATABASE DROP LOGFILE member '/home/oracle_11/app/oradata/orcl/redoB2.log' --（不能删除当前日志组的成员 不然会出错）
                                                                                  
-                 ALTER DATABASE DROP LOGFILE GROUP 2 --（不能删除当前日志组的成员 不然会出错）
- 移动日志
- host copy E:\ORACLEREDOFILE\REDOB5.LOG D:\ORACLE\ORADATA\ORCL\REDOB5.LOG
- ALTER DATABASE RENAME FILE 'E:\ORACLEREDOFILE\REDOB5.LOG' TO 'D:\ORACLE\ORADATA\ORCL\REDOB5.LOG'
+删除日志组：ALTER DATABASE DROP LOGFILE GROUP 2 --（不能删除当前日志组的成员 不然会出错）
+移动日志:host cp /home/oracle_11/app/oradata/orcl/redoB1.log /home/oracle_11/app/oradata/orcl/redoC1.log
+ALTER DATABASE RENAME FILE '/home/oracle_11/app/oradata/orcl/redoB1.log' TO '/home/oracle_11/app/oradata/orcl/redoC1.log'
+host rm /home/oracle_11/app/oradata/orcl/redoB1.log;
  

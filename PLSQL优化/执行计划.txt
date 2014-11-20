@@ -1,0 +1,9 @@
+ 关于Autotrace几个常用选项的说明:
+SET AUTOTRACE OFF ---------------- 不生成AUTOTRACE 报告，这是缺省模式
+SET AUTOTRACE ON EXPLAIN ------ AUTOTRACE只显示优化器执行路径报告
+SET AUTOTRACE ON STATISTICS -- 只显示执行统计信息
+SET AUTOTRACE ON ----------------- 包含执行计划和统计信息
+SET AUTOTRACE TRACEONLY ------ 同set autotrace on，但是不显示查询输出
+	 
+	 EXPLAIN PLAN FOR 方式查看执行计划时oracle本身并不真正的执行该sql 语句，只是对sql进行解析获取执行计划。 
+	 SET AUTOTRACE   方式查看sql语句的执行计划则是oracle 则对sql进行 解析并执行的。

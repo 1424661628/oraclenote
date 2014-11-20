@@ -1,0 +1,88 @@
+准备工作:
+	SQL> conn sys/root as sysdba
+	Connected.
+	SQL> grant select on v_$sql_plan to scott;
+	Grant succeeded.
+	SQL> grant select on v_$session to scott;
+	Grant succeeded.
+	SQL> grant select on v_$sql_plan_statistics_all to scott;
+	Grant succeeded.
+	SQL> grant select on v_$sql to scott;
+	Grant succeeded.
+
+BMS_XPLAN包中display_cursor函数不同于display函数，display_cursor用于显示SQL语句的真实的执行计划.(来自Leshami的dbms_xplan之display函数的使用)。
+
+DISPLAY_CURSOR语法
+	DBMS_XPLAN.DISPLAY_CURSOR(
+	   sql_id        IN  VARCHAR2  DEFAULT  NULL,
+	   child_number  IN  NUMBER    DEFAULT  NULL, 
+	   format        IN  VARCHAR2  DEFAULT  'TYPICAL');
+display_cursor函数参数描述
+        sql_id
+                指定位于库缓存执行计划中SQL语句的父游标。默认值为null。当使用默认值时当前会话的最后一条SQL语句的执行计划将被返回
+                可以通过查询V$SQL 或 V$SQLAREA的SQL_ID列来获得SQL语句的SQL_ID。
+        child_number
+                指定父游标下子游标的序号。即指定被返回执行计划的SQL语句的子游标。默认值为0。如果为null，则sql_id所指父游标下所有子游标
+                的执行计划都将被返回。
+        format
+                控制SQL语句执行计划的输出部分，即哪些可以显示哪些不显示。使用与display函数的format参数与修饰符在这里同样适用。
+                除此之外当在开启statistics_level=all时或使用gather_plan_statistics提示可以获得执行计划中实时的统计信息
+                有关详细的format格式描述请参考：dbms_xplan之display函数的使用 中format参数的描述
+
+        下面给出启用统计信息时format新增的修饰符
+                iostats   控制I/O统计的显示
+                last      默认，显示所有执行计算过的统计。如果指定该值，则只显示最后一次执行的统计信息
+                memstats  控制pga相关统计的显示
+                allstats  此为iostats memstats的快捷方式，即allstats包含了iostats和memstats
+                run_stats_last 等同于iostats last。只能用于oracle 10g R1
+                run_stats_tot  等同于iostats。只能用于oracle 10g R1    
+		
+演示使用display_cursor
+		SQL> set linesize 1000
+		SQL> SELECT /*+ gather_plan_statistics */ * FROM   emp e, dept d WHERE  e.deptno = d.deptno AND    e.ename  = 'CLARK';
+
+		     EMPNO ENAME      JOB	       MGR HIREDATE	    SAL       COMM     DEPTNO	  DEPTNO DNAME		LOC
+		---------- ---------- --------- ---------- --------- ---------- ---------- ---------- ---------- -------------- -------------
+		      7782 CLARK      MANAGER	      7839 09-JUN-81	   2450 		   10	      10 ACCOUNTING	NEW YORK
+
+		SQL> select * from table(dbms_xplan.display_cursor);--采用默认
+
+		PLAN_TABLE_OUTPUT
+		------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		SQL_ID	6xyy7vuxqk5vt, child number 0
+		-------------------------------------
+		SELECT * FROM	emp e, dept d WHERE  e.deptno = d.deptno AND	e.ename
+		 = 'CLARK'
+
+		Plan hash value: 3625962092
+
+		----------------------------------------------------------------------------------------
+		| Id  | Operation		     | Name    | Rows  | Bytes | Cost (%CPU)| Time     |
+		----------------------------------------------------------------------------------------
+		|   0 | SELECT STATEMENT	     |	       |       |       |     4 (100)|	       |
+
+		PLAN_TABLE_OUTPUT
+		------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		|   1 |  NESTED LOOPS		     |	       |       |       |	    |	       |
+		|   2 |   NESTED LOOPS		     |	       |     1 |    58 |     4	 (0)| 00:00:01 |
+		|*  3 |    TABLE ACCESS FULL	     | EMP     |     1 |    38 |     3	 (0)| 00:00:01 |
+		|*  4 |    INDEX UNIQUE SCAN	     | PK_DEPT |     1 |       |     0	 (0)|	       |
+		|   5 |   TABLE ACCESS BY INDEX ROWID| DEPT    |     1 |    20 |     1	 (0)| 00:00:01 |
+		----------------------------------------------------------------------------------------
+
+		Predicate Information (identified by operation id):
+		---------------------------------------------------
+
+		   3 - filter("E"."ENAME"='CLARK')
+
+		PLAN_TABLE_OUTPUT
+		------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+		   4 - access("E"."DEPTNO"="D"."DEPTNO")
+
+
+		24 rows selected.
+总结
+        1、与display函数不同，display_cursor显示的为真实的执行计划
+        2、对于format参数，使用与display函数的各个值，同样适用于display_cursor函数
+        3、当statistics_level为all或使用gather_plan_statistics提示可以获得执行时的统计信息
+        4、根据真实与预估的统计信息可以初步判断SQL效率低下的原因，如统计信息的准确性、主要的开销位于那些步骤等    

@@ -1,0 +1,11 @@
+表访问操作：
+	TABLE ACCESS FULL:全表扫描
+	TABLE ACCESS BY ROWID:通过索引中找到ROWID来存取数据可以快速定位到目标数据上，是Oracle存取单行数据的最快方法
+	TABLE ACCESS BY LOCAL INDEX ROWID:通过本地分区索引中找到ROWID来存取数据可以快速定位到目标数据上
+索引访问操作：
+	INDEX UNIQUE SCAN：唯一索引扫描
+			即对唯一索引或主键进行单一匹配
+	index range scan：索引范围扫描
+			即对索引进行范围匹配操作(如>、<、<>、>=、<=、between、like)或者对非唯一索引进行单一匹配
+	INDEX FAST FULL SCAN：快速完全索引扫描（不排序，每次可以读取多个数据库）
+	INDEX  FULL SCAN：完全索引扫描（排序，每次只读取一个数据库）

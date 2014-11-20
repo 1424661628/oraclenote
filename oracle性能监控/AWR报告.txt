@@ -1,0 +1,208 @@
+O​r​a​c​l​e​数​能​优​化​实​务
+
+自动工作负载库（Automatic Workload Repository，AWR）
+AWR的由来：
+    10g之前的oracle:用户的连接将产生会话，当前会话记录保存在v$session中；处于等待状态的会话会被复制一份放在v$session_wait中。当该连接
+ 断开后，其原来的连接信息在v$session和v$session_wait中就会被删除;oracle10g及之后保留下了v$session_wait中的这些信息，并多了
+v$active_session_history（ASH）视图，记录每个活动session在v$session_wait中最近10次的等待事件。
+
+    ASH的采样数据是保存在内存中。而分配给ASH的内存空间是有限的，当所分配空间占满后，旧的记录就会被覆盖掉；而且数据库重启后，所有的这些
+ASH信息都会消失。这样，对于长期检测oracle的性能是不可能的。在Oracle10g中，提供了永久保留ASH信息的方法，这就是AWR。
+    
+    由于全部保存ASH中的信息是非常耗费时间和空间的，AWR采用的策略是：每小时对v$active_session_history进行采样一次，并将信息保存到磁盘
+中，并且保留7天，7天后旧的记录才会被覆盖。这些采样信息被保存在视图wrh$_active_session_history中。而这个采样频率（1小时）和保留时间
+（7天）是可以根据实际情况进行调整的，这就给DBA们提供了更加有效的系统监测工具。
+
+1．AWR的启用
+
+    在默认情况下，Oracle启用数据库统计收集这项功能（即启用AWR）。是否启用AWR由初始化参数STATISTICS_LEVEL控制。通过SHOW PARAMETER命令
+
+可以显示STATISTICS_LEVEL的当前值：
+
+     SQL> SHOW PARAMETER STATISTICS_LEVEL 
+
+SQL语句的执行结果是：
+NAME                                 TYPE        VALUE
+------------------------------------ ----------- ------------------------------
+statistics_level                     string      TYPICAL
+
+如果STATISTICS_LEVEL的值为TYPICAL或者 ALL，表示启用AWR；如果STATISTICS_LEVEL的值为BASIC，表示禁用AWR。
+
+初始化参数statistics_level介绍：
+AWR的行为受到参数STATISTICS_LEVEL的影响。这个参数有三个值：
+
+*BASIC：awr统计的计算和衍生值关闭.只收集少量的数据库统计信息.
+
+*TYPICAL：默认值．只有部分的统计收集.他们代表需要的典型监控oracle数据库的行为.
+
+*ALL : 所有可能的统计都被捕捉. 并且有操作系统的一些信息.这个级别的捕捉应该在很少的情况下,比如你要更多的sql诊断信息的时候才使用.
+
+
+2．快照（SNAPSHOT）
+
+   每隔一小时，内存监控进程（MMON）自动地采集一次统计信息，并把这些信息存放到负载库中，一次采样就是一个快照。为了节省空间，采集的数据在
+
+7天后自动清除。快照的频率和保留时间可以由用户修改。
+
+--查看快照的频率和保留时间（默认为每1小时采样一次，采样信息保留时间为7天）
+ select * from dba_hist_wr_control;
+ select DBID, SNAP_INTERVAL, SNAPINT_NUM, RETENTION from wrm$_wr_control;
+ 
+--修改 快照的频率和保留时间（单位用分钟）
+exec dbms_workload_repository.modify_snapshot_settings(interval=>60, retention=>7*24*60);
+
+用户也可以使用下面的命令手工采样（手工生成快照）：
+    BEGIN  
+    DBMS_WORKLOAD_REPOSITORY.CREATE_SNAPSHOT ();  
+    END; 
+
+手工删除指定范围的快照
+  begin
+  dbms_workload_repository.drop_snapshot_range(low_snap_id => 3965, high_snap_id => 3966, dbid => 3437504306);
+  end;
+    
+ --查看有多少个快照
+ select count(1) from wrh$_active_session_history;
+ select count(1) from dba_hist_active_sess_history;
+ 
+通过查询视图DBA_HIST_SNAPSHOT，可以知道系统中产生了哪些快照。
+select * from DBA_HIST_SNAPSHOT;
+
+3.采样数据存放位置
+
+    这些采样数据都存储在SYSAUX表空间中，并且以WRM$_* 和 WRH$_*的格式命名。前一种类型存储元数据信息（如检查的数据库和采集的快照），
+后一种类型保存实际采集的统计数据。
+select table_name from dba_tables where table_name like 'WRM$%';
+ 
+TABLE_NAME
+-----------------------
+WRM$_WR_CONTROL
+WRM$_SNAP_ERROR
+WRM$_SNAPSHOT
+WRM$_DATABASE_INSTANCE
+WRM$_BASELINE
+
+当SYSAUX表空间满后，AWR将自动覆盖掉旧的信息，并在警告日志中记录一条相关信息：
+ORA-1688: unable to extend table SYS.WRH$_ACTIVE_SESSION_HISTORY partition WRH$_ACTIVE_3533490838_1522 by 128 in                 tablespace SYSAUX
+
+select table_name from dba_tables where table_name like 'WRH$%';
+
+4. 设置基线
+ 4.1创建基线
+    基线（baseline）是一种机制,这样你可以在重要时间的快照信息集做标记。一个基线定义在一对快照之间,快照通过他们的快照序列号识别.每个
+基线有且只有一对快照。一次典型的性能调整实践从采集量度的基准线集合、作出改动、然后采集另一个基准线集合开始。可以比较这两个集合来检查
+所作的改动的效果。在 AWR 中，对现有的已采集的快照可以执行相同类型的比较。
+
+    假定一个名称为 apply_interest 上午 2:00 到 4:00 之间运行，对应快照 ID 4150 到 4151。我们可以为这些快照定义
+一个名称为 apply_interest_1 的基准线：
+
+SQL> exec dbms_workload_repository.create_baseline(4150, 4151, 'apply_interest_1');
+
+这一操作将快照从 4150 到 4151 编号，作为上面指定的基准线的一部分。查看现有的基准线：
+SQL> select *from dba_hist_baseline;
+ 
+ DBID      BASELINE_ID  BASELINE_NAME        START_SNAP_ID  START_SNAP_TIME                  END_SNAP_ID END_SNAP_TIME
+---------- ----------- -------------------- ------------- --------------------------------  ----------- -------------------------------
+3437504306     1        apply_interest_1     4150          07-3月 -11 03.00.47.627 上午       4151        07-3月 -11 04.00.12.567 上午
+ 
+SQL> select *from wrm$_baseline;
+ 
+DBID        BASELINE_ID BASELINE_NAME                   START_SNAP_ID  END_SNAP_ID
+---------- ----------- ------------------------------  -------------  -----------
+3437504306      1       apply_interest_1                 4150             4151
+ 
+
+在一些调整步骤之后，我们可以创建另一个基准线 — 假设名称为 apply_interest_2（下午2点到4点），然后只为那些与这两条基准线相关的快照比较量度。
+SQL> exec dbms_workload_repository.create_baseline(4162, 4163, 'apply_interest_2');
+ 
+像这样把快照分隔在仅仅几个集合中有助于研究调整对于性能量度的影响。
+
+4.2 删除基线
+    分析之后使用 drop_baseline() 来删除基准线；快照将保留（也可级联删除）。此外，当清除例程开始删除旧的快照时，与基准线相关的快照不会
+被清除，从而允许进行进一步的分析。
+如果要删除一个基准线:
+SQL> exec dbms_workload_repository.drop_baseline(baseline_name=>'apply_interest_1', cascade=>false);
+ 
+SQL> select *from wrh$_active_session_history where snap_id in (4150,4151);
+ 
+SNAP_ID  DBID     INSTANCE_NUMBER  SAMPLE_ID SAMPLE_TIME                  SESSION_ID ...
+4150 3437504306    1             14900840   07-3月 -11 02.55.02.038 上午   162       ...   
+4150 3437504306    1             14900200   07-3月 -11 02.44.21.942 上午   165       ...  
+....
+4151 3437504306    1             14901980   07-3月 -11 03.14.02.213 上午  165        ...    
+4151 3437504306    1             14901790   07-3月 -11 03.10.52.183 上午  165        ...  
+4151 3437504306    1             14901490   07-3月 -11 03.05.52.138 上午  167        ... 
+ 
+--级联删除（基线与快照一块删）
+SQL> exec dbms_workload_repository.drop_baseline(baseline_name=>'apply_interest_2', cascade=>true);
+ 
+SQL> select *from wrh$_active_session_history where snap_id in (4162,4163);
+未选定行
+
+5．产生AWR报告
+
+    Oracle可以产生两种类型的AWR报告：文本格式和HTML 格式。HTML格式的报告界面更加友好。AWR报告用于显示两个快照或者两个时间点之间捕捉到
+
+的数据。AWR报告其实就是一张数据库健康体检表，它显示了数据库健康的各项指标。
+
+    有针对整个数据库的AWR报告，有针对某个实例的AWR报告（在集群环境），有针对单条SQL语句的AWR报告。通过运行Oracle自带的SQL脚本产生
+
+AWR报告，只是产生不同的AWR报告，需要运行不同的脚本。
+
+    --产生整个数据库的AWR报告，运行脚本awrrpt.sql。
+
+   @$ORACLE_HOME/rdbms/admin/awrrpt.sql 
+
+    --产生某个实例的AWR报告，运行脚本awrrpti.sql。
+
+   @$ORACLE_HOME/rdbms/admin/awrrpti.sql 
+
+    --产生某条SQL语句的AWR报告，运行脚本awrsqrpt.sql。
+
+   @$ORACLE_HOME/rdbms/admin/awrsqrpt.sql 
+
+--注： $ORACLE_HOME代表Oracle的主目录。
+
+示例：产生整个数据库的AWR报告。本例中，Oracle的主目录是 /oracle/product/10.2.0/db_1/rdbms/admin
+
+运行脚本awrrpt.sql。
+
+    SQL> @/oracle/product/10.2.0/db_1/rdbms/admin/awrrpt.sql 
+
+选择报告的类型。
+
+   1. 输入 report_type 的值:  html 
+
+本例中选择HTML。
+
+列出最近两天产生的快照（主要是获得快照ID）
+
+   1. 输入 num_days 的值:  2  
+
+                                                        Snap
+Instance     DB Name        Snap Id    Snap Started    Level
+------------ ------------ --------- ------------------ -----
+telemt       TELEMT            4123 06 Mar 2011 00:00      1
+                               4124 06 Mar 2011 01:01      1
+....
+                               4160 07 Mar 2011 13:00      1
+                               4161 07 Mar 2011 14:00      1
+
+指定起始快照的ID和结束快照的ID。
+
+   1. Specify the Begin and End Snapshot Ids  
+   2. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  
+   3. 输入 begin_snap 的值:  4123
+   4. Begin Snapshot Id specified: 4123 
+   5.  
+   6. 输入 end_snap 的值:  4161 
+   7. End   Snapshot Id specified: 4161
+
+本例中起始快照的ID是4123，结束快照的ID是4161。
+
+指定报告的名字。
+
+    输入 report_name 的值:  myreport.html 
+    
+注意：输入报告名后回车出现 ORA-00904:: invalid identified value
+解决办法：用sys用户来执行或者对用户进行授权 grant all on dbms_workload_repository to perfstat;

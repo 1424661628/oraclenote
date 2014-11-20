@@ -1,21 +1,113 @@
-查看数据库的日志模式
-SELECT LOG_MODE FROM V$DATABASE;
-显示归档日志信息 archive log list;
-select name,sequence#,first_change# from v$archived_log;
-select destination from v$archive_dest;
-改变数据库为 ARCHIVELOG模式 
+归档日志：非活动的重做日志，用来保存所有的重做历史记录。
+什么时候写归档日志：当数据库处于archivelog模式并重做日志切换的时候，后台进程ARCH会启动将重做日志的内容完整的保存到归档日志中。
+日志操作模式：
+	NOARCHIVELOG模式不保留重做日志记录的历史，只能保护例程失败不能保护介质失败。
+		特点：
+		LGWR进程写日志时候覆盖原先的重做日志内容
+		如果日志内容被覆盖，只能恢复到过去完整备份的点
+		执行数据库备份时候，必须关闭数据库
+		执行备份时候，必须备份所有数据文件和控制文件
+	ARCHIVELOG模式保留重做日志记录的历史，不仅能保护例程失败而且可以保护介质失败。
+		特点：
+		出现数据文件丢失损坏，可以防止数据丢失。
+		数据库处于open状态的时候，也可以备份数据库
+		出现数据文件损坏的时候可以在Open状态下进行恢复
+		执行数据库恢复的时候，可以进行不完整恢复，基于（SCN，时间点，日志序列号）等等
+选择：如果数据库用于生产环境并且数据变化频繁应该采用ARCHIVELOG模式
+	
+
+查看数据库的日志模式：
+	SQL> SELECT LOG_MODE FROM V$DATABASE;
+
+	LOG_MODE
+	------------
+	ARCHIVELOG
+
+显示归档日志信息：
+	SQL> archive log list
+	Database log mode	       Archive Mode
+	Automatic archival	       Enabled
+	Archive destination	       USE_DB_RECOVERY_FILE_DEST
+	Oldest online log sequence     18
+	Next log sequence to archive   20
+	Current log sequence	       20
+
+	SQL> col name format a40
+	SQL> select name,sequence#,first_change# from v$archived_log;--显示归档日志信息
+
+	NAME					  SEQUENCE#	 FIRST_CHANGE#
+	---------------------------------------- ---------- ------------------
+	/home/oracle_11/app/flash_recovery_area/	 13		989430
+	ORCL/archivelog/2014_03_07/o1_mf_1_13_9k
+	m0lbfq_.arc
+
+	/home/oracle_11/app/flash_recovery_area/	 14	       1017107
+	ORCL/archivelog/2014_04_24/o1_mf_1_14_9o
+	l713oz_.arc
+
+	/home/oracle_11/app/flash_recovery_area/	 15	       1049472
+	ORCL/archivelog/2014_04_28/o1_mf_1_15_9o
+	wmkc6r_.arc
+
+	NAME					  SEQUENCE#	 FIRST_CHANGE#
+	---------------------------------------- ---------- ------------------
+
+	/home/oracle_11/app/flash_recovery_area/	 16	       1073533
+	ORCL/archivelog/2014_04_29/o1_mf_1_16_9o
+	z8143l_.arc
+
+	/home/oracle_11/app/flash_recovery_area/	 17	       1098869
+	ORCL/archivelog/2014_05_04/o1_mf_1_17_9p
+	dcvm77_.arc
+
+	/home/oracle_11/app/flash_recovery_area/	 18	       1124400
+	ORCL/archivelog/2014_05_05/o1_mf_1_18_9p
+
+	NAME					  SEQUENCE#	 FIRST_CHANGE#
+	---------------------------------------- ---------- ------------------
+	gnc6gx_.arc
+
+	/home/oracle_11/app/flash_recovery_area/	 19	       1158501
+	ORCL/archivelog/2014_05_05/o1_mf_1_19_9p
+	h2d9d9_.arc
+
+
+
+	SQL>select destination from v$archive_dest;--归档日志位置
+	（注意：oracle10默认是把存档终点设置为USE_DB_RECOVERY_FILE_DEST，所以归档日志默认是保存在oracle系统的闪回恢复区（Flash recovery area）的。
+	默认的db_recovery_file_dest是2G，由于归档日志太大，撑满了闪回恢复区，启动数据报ORA-00257错误，
+	所以一般建议将存档终点修改为操作系统的适当目录。）
+
+改变数据库归档模式：
 		SHUTDOWN IMMEDIATE
 		STARTUP MOUNT
-		ALTER DATABASE ARCHIVELOG
+		ALTER DATABASE ARCHIVELOG|NOARCHIVELOG
 		ALTER DATABASE OPEN
-配置归档日志进程  ALTER SYSTEM SET LOG_ARCHIVE_MAX_PROCESSES=3
+手动归档：
+		ALTER DATABASE ARCHIVELOG MANUAL
+		ALTER SYSTEM ARCHIVELOG ALL|CURRENT
+配置归档日志进程 ：ALTER SYSTEM SET LOG_ARCHIVE_MAX_PROCESSES=3（默认进程数目为2，
+			 一般不需要修改该参数，Oracle会根据归档情况自动启动额外的归档进程）
 
-配置归档日志位置：1-2个时候 
+配置归档日志位置：默认归档日志位于db_recovery_file_dest 缺省为$ORACLE_BASE/flash_recovey_area
+		 配置1-2个：
    			ALTER SYSTEM SET LOG_ARCHIVE_DEST='路径'；
-				ALTER SYSTEM SET LOG_ARCHIVE_duplex_DEST='路径'；
-		 配置多个：ALTER SYSTEM SET LOG_ARCHIVE_DEST=''；
-				ALTER SYSTEM SET LOG_ARCHIVE_duplex_DEST=''；
-				ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='location=路径'
-				ALTER SYSTEM SET LOG_ARCHIVE_DEST_2='location=路径'
-				ALTER SYSTEM SET LOG_ARCHIVE_DEST_3='location=路径'
-				ALTER SYSTEM SET LOG_ARCHIVE_DEST_4='service=standby'
+			ALTER SYSTEM SET LOG_ARCHIVE_duplex_DEST='路径'；
+		 配置多个：
+			 ALTER SYSTEM SET LOG_ARCHIVE_DEST=''；
+			 ALTER SYSTEM SET LOG_ARCHIVE_duplex_DEST=''；
+			 ALTER SYSTEM SET LOG_ARCHIVE_DEST_1='location=路径'
+			 ALTER SYSTEM SET LOG_ARCHIVE_DEST_2='location=路径'
+			 ALTER SYSTEM SET LOG_ARCHIVE_DEST_3='location=路径'
+			 ALTER SYSTEM SET LOG_ARCHIVE_DEST_4='service=standby'
+		（ 对于远程归档位置,SERVICE选项需要指定远程数据库的网络服务名(在tnsnames.ora文件中配置)）
+d.归档日志命名格式
+            设置LOG_ARCHIVE_FORMAT参数，Unix下的缺省设置为LOG_ARCHIVE_FORMAT=%t_%s_%r.dbf
+                %s: 日志序列号:
+                %S: 日志序列号(带有前导)
+                %t: 重做线程编号.
+                %T: 重做线程编号(带有前导)
+                %a: 活动ID号
+                %d: 数据库ID号
+                %r RESETLOGS的ID值.
+              alter system set log_archive_format = 'arch_%t_%s_%r.arc';

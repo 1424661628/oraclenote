@@ -1,0 +1,58 @@
+所谓通道：是指由服务器进程发起并控制目标数据库的文件与物理设备之间的字节流。一个通道即为一个会话，一个会话对应于一个服务器进程。所有的备份和恢复操作都是由RMAN连接的服务器进程完成的，更确切的说：是由通道完成的。通道的分配主要有两种形式：自动分配通道和手动分配通道。
+
+一、自动分配通道：自动分配通道是指在执行RMAN命令时，不需要显式制定通道的细节就可以使用通道。（实际上也是使用预先设置或是使用默认的设置）
+
+1、查看默认的通道设备类型设置类型
+RMAN> show default device type;
+using target database control file instead of recovery catalog
+RMAN configuration parameters for database with db_unique_name PRAC are:
+CONFIGURE DEFAULT DEVICE TYPE TO DISK; # default
+2、查看可用的设备类型（含通道的数目）
+RMAN> show device type;
+RMAN configuration parameters for database with db_unique_name PRAC are:
+CONFIGURE DEVICE TYPE DISK PARALLELISM 1 BACKUP TYPE TO BACKUPSET; # default
+修改设备备份并行度：
+RMAN> configure device type disk parallelism 2;    --设置设备备份并行度为2，这样备份开始时会使用两个通道进行备份。
+new RMAN configuration parameters:
+CONFIGURE DEVICE TYPE DISK PARALLELISM 2 BACKUP TYPE TO BACKUPSET;
+new RMAN configuration parameters are successfully stored
+还原默认设置值：
+RMAN> configure device type disk clear;
+old RMAN configuration parameters:
+CONFIGURE DEVICE TYPE DISK PARALLELISM 2 BACKUP TYPE TO BACKUPSET;
+RMAN configuration parameters are successfully reset to default value
+3、查看通道配置
+RMAN> show channel;
+RMAN configuration parameters for database with db_unique_name PRAC are:
+RMAN configuration has no stored or default parameters
+修改通道配置：
+RMAN> configure channel device type disk maxpiecesize 2G;    --设置最大备份片的大小为2G
+new RMAN configuration parameters:
+CONFIGURE CHANNEL DEVICE TYPE DISK MAXPIECESIZE 2 G;
+new RMAN configuration parameters are successfully stored
+RMAN> configure channel 1 device type disk to destination '/u02/backup';    --设置通道1的备份路径为'/u02/backup'
+new RMAN configuration parameters:
+CONFIGURE CHANNEL 1 DEVICE TYPE DISK TO DESTINATION   '/u02/backup';
+new RMAN configuration parameters are successfully stored
+还原通道配置：
+RMAN> configure channel device type disk clear;
+old RMAN configuration parameters:
+CONFIGURE CHANNEL DEVICE TYPE DISK MAXPIECESIZE 2 G;
+old RMAN configuration parameters are successfully deleted
+
+RMAN> configure channel 1 device type disk clear;
+old RMAN configuration parameters:
+CONFIGURE CHANNEL 1 DEVICE TYPE DISK TO DESTINATION   '/u02/backup';
+old RMAN configuration parameters are successfully deleted
+
+二、手动通道分配：这个大家都懂的哈，在run运行块中使用allocate channel命令分配通道。例如：
+RMAN> run {
+2> allocate channel ch1 device type disk to destination '/u02/backup/';
+3> allocate channel ch2 device type disk to destination '/u02/backup/';
+4> backup
+5> (tablespace users channel ch1)
+6> (tablespace example channel ch2);
+7> }
+
+三、实验完成后，使用如下命令删除测试库里的所有备份集（生产库中千万不要如此！）
+delete noprompt backup;
