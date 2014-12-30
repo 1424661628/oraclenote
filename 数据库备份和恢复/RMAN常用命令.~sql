@@ -142,7 +142,8 @@ RMAN>  BACKUP ARCHIVELOG ALL DELETE INPUT;
 
 RMAN>  DELETE BACKUPSET 22 FORMAT  =  'd:\backup\%u.bak'  DELETE INPUT;
 
---保存策略 (retention policy)
+
+4.2.1 保存策略 (retention policy)
    configure retention policy to recovery window of 7 days;
    configure retention policy to redundancy 5;
    configure retention policy clear;

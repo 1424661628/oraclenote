@@ -9,7 +9,7 @@ LIST BACKUP tag='TAG20141202T051249'
 
 
 LIST BACKUP 22;
-LIST BACKUPSET; 好像backup和backupset是同一个概念
+LIST BACKUPSET;
 
 基本概念：
   备份片(BACKUPPIECE)表示一个由RMAN产生备份的文件。用OS工具可以实实在在的看到。
